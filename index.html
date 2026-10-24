@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{margin:0}</style>
+<title>Калькулятор опалення</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: робочий лист монтажника: підсумок зверху, далі параметри, кімнати, кошторис; нижня панель з головними цифрами завжди під рукою */
+:root{
+  --bg:#f1f4f6; --surface:#ffffff; --ink:#14202b; --muted:#5a6a77; --line:#d3dbe1; --field:#f5f7f9;
+  --heat:#cf4510; --heat-soft:#fbe5db; --cool:#1d5c88;
+  --s1:#cf4510; --s2:#1d5c88; --s3:#b58a12; --s4:#6f5a9e; --s5:#6b7b87;
+  --display:'Onest',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e151b; --surface:#16202a; --ink:#e6edf1; --muted:#93a3b0; --line:#27343f; --field:#0f1820;
+    --heat:#ff8250; --heat-soft:#3a2219; --cool:#6db5e3;
+    --s1:#ff8250; --s2:#6db5e3; --s3:#e0b84a; --s4:#a893d6; --s5:#8a9aa6;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e151b; --surface:#16202a; --ink:#e6edf1; --muted:#93a3b0; --line:#27343f; --field:#0f1820;
+  --heat:#ff8250; --heat-soft:#3a2219; --cool:#6db5e3;
+  --s1:#ff8250; --s2:#6db5e3; --s3:#e0b84a; --s4:#a893d6; --s5:#8a9aa6;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--display); font-size:15px; line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:22px 110px;
+}
+.wrap{max-width:780px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+h1{font-size:26px;line-height:1.15;margin:0;font-weight:700;text-wrap:balance;letter-spacing:-.01em}
+.lead{margin:6px 0 0;color:var(--muted);max-width:60ch}
+h2{margin:0 0 10px;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* summary */
+.hero{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .v{font-family:var(--mono);font-weight:600;font-size:26px;line-height:1.2;font-variant-numeric:tabular-nums}
+.stat .v small{font-size:13px;color:var(--muted);font-weight:400;margin-left:3px}
+.stat.main .v{color:var(--heat)}
+.bar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--field);margin-top:14px}
+.bar i{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:12.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.legend b{display:inline-block;width:9px;height:9px;border-radius:2px}
+.legend em{font-style:normal;font-family:var(--mono);color:var(--ink)}
+
+/* fields */
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (min-width:560px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}.grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f span{font-size:12.5px;color:var(--muted)}
+.f.wide{grid-column:1/-1}
+input,select{
+  font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:7px;
+  padding:9px 10px;width:100%;min-width:0;min-height:42px;
+}
+input[inputmode=text]{font-family:var(--mono);font-variant-numeric:tabular-nums}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--cool);outline-offset:1px}
+.check{display:flex;align-items:center;gap:10px;min-height:42px}
+.check input{width:20px;min-height:20px;height:20px;accent-color:var(--heat)}
+.check span{font-size:14px;color:var(--ink)}
+
+/* rooms */
+#rooms{display:flex;flex-direction:column;gap:12px}
+.room-h{display:flex;gap:10px;margin-bottom:12px}
+.room-h .name{font-weight:600;font-size:16px}
+button{font:inherit;cursor:pointer;border-radius:7px;min-height:42px;padding:0 14px}
+.x{background:transparent;color:var(--muted);border:1px solid var(--line);white-space:nowrap}
+.x:hover{color:var(--heat);border-color:var(--heat)}
+.add{width:100%;background:transparent;border:1.5px dashed var(--line);color:var(--ink);font-weight:500}
+.add:hover{border-color:var(--heat);color:var(--heat)}
+.res{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:4px 18px;font-size:14px}
+.res .num{font-weight:600}
+.res .q{color:var(--heat)}
+.res .bar{flex-basis:100%;margin-top:8px;height:6px}
+
+/* estimate */
+.grp{margin:18px 0 6px;font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.grp:first-of-type{margin-top:0}
+.row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(0,1fr);gap:4px 10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.row .nm{grid-column:1/-1;font-weight:500}
+.row .qty{font-size:13.5px;color:var(--muted)}
+.row .pr{display:flex;align-items:center;gap:6px;min-width:0}
+.row .pr input{padding:6px 8px;min-height:36px;text-align:right}
+.row .pr span{font-size:12px;color:var(--muted);white-space:nowrap}
+.row .sum{text-align:right;font-weight:600}
+.tot{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.tot.big{border-top:2px solid var(--ink);font-size:18px;font-weight:700}
+.tot.big .num{color:var(--heat);font-size:22px}
+
+.note{font-size:12.5px;color:var(--muted);max-width:68ch}
+.tools{display:flex;flex-wrap:wrap;gap:10px}
+.btn{background:var(--ink);color:var(--bg);border:0;font-weight:600}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+textarea{width:100%;min-height:150px;font-family:var(--mono);font-size:12.5px;background:var(--field);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:10px}
+
+/* bottom bar */
+.dock{
+  position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--surface);border-top:1px solid var(--line);
+  padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+}
+.dock div{max-width:780px;margin:0 auto;display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.dock .a{font-size:13px;color:var(--muted)}
+.dock .a b{color:var(--ink);font-family:var(--mono);font-weight:600}
+.dock .t{font-family:var(--mono);font-weight:700;font-size:18px;color:var(--heat);font-variant-numeric:tabular-nums}
+@media (max-width:420px){.stat .v{font-size:21px}.hero{gap:8px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<noscript><p style="padding:16px;font:16px sans-serif">Для роботи калькулятора потрібен JavaScript. Відкрийте файл у Chrome або Safari.</p></noscript>
+<div class="wrap">
+  <header>
+    <h1>Калькулятор опалення</h1>
+    <p class="lead">Тепловтрати кімнат, радіатори, котел, труби й кошторис у гривнях. Введіть розміри та свої ціни, цифри оновлюються одразу.</p>
+  </header>
+
+  <section class="panel" aria-label="Підсумок">
+    <div class="hero">
+      <div class="stat main"><div class="k">Тепловтрати обʼєкта</div><div class="v" id="sQ">0<small>кВт</small></div></div>
+      <div class="stat"><div class="k">Котел</div><div class="v" id="sB">0<small>кВт</small></div></div>
+      <div class="stat"><div class="k">Кошторис</div><div class="v" id="sT">0<small>грн</small></div></div>
+    </div>
+    <div class="bar" id="bar" role="img" aria-label="Розподіл тепловтрат"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <section>
+    <h2>Обʼєкт</h2>
+    <div class="panel">
+      <div class="grid">
+        <label class="f"><span>Місто</span><select id="city" data-p="city"><option value="0" selected>Київ</option><option value="1">Львів</option><option value="2">Харків</option><option value="3">Одеса</option><option value="4">Дніпро</option><option value="5">Запоріжжя</option><option value="6">Вінниця</option><option value="7">Житомир</option><option value="8">Полтава</option><option value="9">Чернівці</option><option value="10">Ужгород</option><option value="11">Івано-Франківськ</option><option value="12">Луцьк</option><option value="13">Рівне</option><option value="14">Чернігів</option><option value="15">Суми</option><option value="16">Миколаїв</option><option value="17">Херсон</option><option value="18">Хмельницький</option><option value="19">Тернопіль</option><option value="20">Черкаси</option><option value="21">Кропивницький</option></select></label>
+        <label class="f"><span>Зовнішня температура, °C</span><input id="tout" type="text" inputmode="text" autocomplete="off" data-p="tout"></label>
+        <label class="f"><span>Повітрообмін, разів на годину</span><input id="n" type="text" inputmode="text" autocomplete="off" data-p="n"></label>
+        <label class="f wide"><span>Стіни</span><select id="wall" data-p="wall"><option value="0">Цегла 380 мм без утеплення (U 1.45)</option><option value="1">Газобетон 375 мм без утеплення (U 0.65)</option><option value="2" selected>Цегла або блок + 100 мм утеплювача (U 0.3)</option><option value="3">Газобетон + 100 мм утеплювача (U 0.22)</option><option value="4">Каркас або SIP 150–200 мм (U 0.2)</option></select></label>
+        <label class="f wide"><span>Вікна</span><select id="win" data-p="win"><option value="0">Старі дерев'яні (U 2.6)</option><option value="1" selected>Склопакет двокамерний (U 1.5)</option><option value="2">Енергозберігаючі (U 1.0)</option></select></label>
+        <label class="f"><span>Дах / горище</span><select id="roofU" data-p="roof"><option value="0" selected>Горище утеплене 200 мм (U 0.2)</option><option value="1">Горище слабко утеплене (U 0.5)</option><option value="2">Дах не утеплений (U 1.2)</option></select></label>
+        <label class="f"><span>Підлога по ґрунту</span><select id="floorU" data-p="floor"><option value="0" selected>Утеплена (U 0.3)</option><option value="1">Без утеплення (U 0.6)</option></select></label>
+        <label class="f"><span>Запас на кути й сторони світу, %</span><input id="margin" type="text" inputmode="text" autocomplete="off" data-p="margin"></label>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Кімнати</h2>
+    <div id="rooms"></div>
+    <button class="add" id="addRoom" type="button" style="margin-top:12px">+ Додати кімнату</button>
+  </section>
+
+  <section>
+    <h2>Обладнання</h2>
+    <div class="panel">
+      <div class="grid">
+        <label class="f wide"><span>Радіатори</span><select id="rad" data-p="rad"><option value="0" selected>Сталева панель тип 22, H500</option><option value="1">Біметалічні секції</option><option value="2">Алюмінієві секції</option></select></label>
+        <label class="f wide"><span>Котел</span><select id="fuel" data-p="fuel"><option value="0" selected>Газовий настінний</option><option value="1">Електричний</option><option value="2">Твердопаливний</option></select></label>
+        <label class="f"><span>Запас потужності котла, %</span><input id="reserve" type="text" inputmode="text" autocomplete="off" data-p="reserve"></label>
+        <label class="f"><span>Труб на один радіатор, м</span><input id="pipePer" type="text" inputmode="text" autocomplete="off" data-p="pipePer"></label>
+        <label class="f"><span>Запас матеріалу на відходи, %</span><input id="waste" type="text" inputmode="text" autocomplete="off" data-p="waste"></label>
+        <label class="check wide"><input id="dhw" type="checkbox" data-p="dhw"><span>Котел також гріє воду (ГВП), +25% потужності</span></label>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Кошторис</h2>
+    <div class="panel" id="est"></div>
+    <p class="note" style="margin-top:10px">Ціни в таблиці умовні. Змініть їх на свої, і сума перерахується.</p>
+  </section>
+
+  <section class="tools">
+    <button class="btn" id="copy" type="button">Скопіювати підсумок</button>
+    <button class="btn ghost" id="reset" type="button">Скинути до прикладу</button>
+  </section>
+  <textarea id="copyArea" hidden readonly aria-label="Підсумок для копіювання"></textarea>
+
+  <p class="note">Спрощений розрахунок: Q = U × S × ΔT для стін, вікон, даху й підлоги плюс вентиляція за формулою 0,34 × n × V × ΔT. Розрахункові температури та коефіцієнти наближені. Для проєкту й погодження потрібен розрахунок за ДБН В.2.6-31 і ДСТУ Б А.2.2-12:2015.</p>
+</div>
+
+<div class="dock" aria-live="polite"><div>
+  <span class="a">Втрати <b id="dQ">0 кВт</b> · Котел <b id="dB">0 кВт</b></span>
+  <span class="t" id="dT">0 грн</span>
+</div></div>
+
+<script>
+(function(){
+var CITIES=[["Київ",-22],["Львів",-19],["Харків",-23],["Одеса",-18],["Дніпро",-23],["Запоріжжя",-22],["Вінниця",-21],["Житомир",-22],["Полтава",-23],["Чернівці",-19],["Ужгород",-17],["Івано-Франківськ",-20],["Луцьк",-20],["Рівне",-21],["Чернігів",-23],["Суми",-23],["Миколаїв",-21],["Херсон",-20],["Хмельницький",-21],["Тернопіль",-20],["Черкаси",-22],["Кропивницький",-22]];
+var WALLS=[["Цегла 380 мм без утеплення",1.45],["Газобетон 375 мм без утеплення",0.65],["Цегла або блок + 100 мм утеплювача",0.30],["Газобетон + 100 мм утеплювача",0.22],["Каркас або SIP 150–200 мм",0.20]];
+var WINS=[["Старі дерев'яні",2.6],["Склопакет двокамерний",1.5],["Енергозберігаючі",1.0]];
+var ROOFS=[["Горище утеплене 200 мм",0.20],["Горище слабко утеплене",0.50],["Дах не утеплений",1.20]];
+var FLOORS=[["Утеплена",0.30],["Без утеплення",0.60]];
+var RADS=[
+ {n:"Сталева панель тип 22, H500",unit:"м",w:1100,step:0.1,price:2200},
+ {n:"Біметалічні секції",unit:"секц.",w:150,step:1,price:150},
+ {n:"Алюмінієві секції",unit:"секц.",w:170,step:1,price:135}];
+var FUELS=[
+ {n:"Газовий настінний",per:1100,sizes:[12,18,24,28,32,35,40]},
+ {n:"Електричний",per:700,sizes:[6,9,12,15,18,24,30]},
+ {n:"Твердопаливний",per:1300,sizes:[15,20,25,30,40,50]}];
+var DEF={rad:2200,kit:650,boiler:1100,pipe:85,fit:45,ins:25,manifold:600,bundle:9500,wRad:1500,wPipe:60,wBoiler:8000,wStart:4000};
+var ROOF_OPT=[["attic","Дах або горище"],["heated","Зверху опалюване"]];
+var FLOOR_OPT=[["ground","По ґрунту"],["cold","Над холодним підвалом"],["heated","Над опалюваним"]];
+var SEG=[["wall","Стіни","--s1"],["win","Вікна й двері","--s2"],["roof","Дах","--s3"],["floor","Підлога","--s4"],["vent","Вентиляція","--s5"]];
+var KEY="heat-calc-v1";
+
+function room(name,l,w,h,ow,win,door,t,roof,floor){return {name:name,l:l,w:w,h:h,ow:ow,win:win,door:door,t:t,roof:roof,floor:floor};}
+function fresh(){return {
+  p:{city:0,tout:-22,wall:2,win:1,roof:0,floor:0,n:0.5,margin:10,rad:0,fuel:0,reserve:20,dhw:true,pipePer:12,waste:5},
+  rooms:[room("Вітальня",5,4,2.7,9,4.5,0,20,"attic","ground"),
+         room("Спальня",4,3.5,2.7,4,2.4,0,20,"attic","ground"),
+         room("Кухня",3.5,3,2.7,3.5,1.8,1.9,20,"attic","ground"),
+         room("Санвузол",2.5,2,2.7,2.5,0.5,0,24,"attic","ground")],
+  prices:JSON.parse(JSON.stringify(DEF))
+};}
+var S=load()||fresh();
+function load(){try{var s=localStorage.getItem(KEY);if(!s)return null;var o=JSON.parse(s);if(o&&o.p&&o.rooms&&o.prices)return o;}catch(e){}return null;}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+
+function $(id){return document.getElementById(id);}
+function num(v){var x=parseFloat(String(v).replace(",","."));return isNaN(x)?0:x;}
+function fmt(n){return Math.round(n).toLocaleString("uk-UA");}
+function fmt1(n){return (Math.round(n*10)/10).toLocaleString("uk-UA",{minimumFractionDigits:0,maximumFractionDigits:1});}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");}
+function opts(arr,fn){return arr.map(function(a,i){return '<option value="'+i+'">'+esc(fn(a))+'</option>';}).join("");}
+
+/* ---------- static controls ---------- */
+$("city").innerHTML=opts(CITIES,function(c){return c[0];});
+$("wall").innerHTML=opts(WALLS,function(a){return a[0]+" (U "+a[1]+")";});
+$("win").innerHTML=opts(WINS,function(a){return a[0]+" (U "+a[1]+")";});
+$("roofU").innerHTML=opts(ROOFS,function(a){return a[0]+" (U "+a[1]+")";});
+$("floorU").innerHTML=opts(FLOORS,function(a){return a[0]+" (U "+a[1]+")";});
+$("rad").innerHTML=opts(RADS,function(a){return a.n;});
+$("fuel").innerHTML=opts(FUELS,function(a){return a.n;});
+
+function syncParams(){
+  var p=S.p;
+  ["city","tout","n","wall","win","margin","rad","fuel","reserve","pipePer","waste"].forEach(function(k){$(k).value=p[k];});
+  $("roofU").value=p.roof;$("floorU").value=p.floor;$("dhw").checked=!!p.dhw;
+}
+
+document.addEventListener("input",paramHandler);
+document.addEventListener("change",paramHandler);
+function paramHandler(e){
+  var t=e.target;
+  if(t.dataset&&t.dataset.p){
+    var k=t.dataset.p;
+    S.p[k]=t.type==="checkbox"?t.checked:num(t.value);
+    if(k==="city"&&e.type==="change"){S.p.tout=CITIES[S.p.city][1];$("tout").value=S.p.tout;}
+    if(k==="rad"&&e.type==="change"){S.prices.rad=RADS[S.p.rad].price;}
+    if(k==="fuel"&&e.type==="change"){S.prices.boiler=FUELS[S.p.fuel].per;}
+    refresh();return;
+  }
+  if(t.dataset&&t.dataset.price){S.prices[t.dataset.price]=num(t.value);refresh();return;}
+  if(t.dataset&&t.dataset.f){
+    var card=t.closest(".room");if(!card)return;
+    var r=S.rooms[+card.dataset.i],f=t.dataset.f;
+    r[f]=(f==="name"||f==="roof"||f==="floor")?t.value:num(t.value);
+    refresh();
+  }
+}
+
+/* ---------- rooms ---------- */
+function fld(i,f,label,val){
+  return '<label class="f"><span>'+label+'</span><input id="r'+i+'-'+f+'" type="text" inputmode="text" autocomplete="off" data-f="'+f+'" value="'+val+'"></label>';
+}
+function sel(i,f,label,list,val){
+  return '<label class="f"><span>'+label+'</span><select id="r'+i+'-'+f+'" data-f="'+f+'">'+list.map(function(o){return '<option value="'+o[0]+'"'+(o[0]===val?" selected":"")+'>'+o[1]+'</option>';}).join("")+'</select></label>';
+}
+function renderRooms(){
+  $("rooms").innerHTML=S.rooms.map(function(r,i){
+    return '<article class="panel room" data-i="'+i+'">'+
+      '<div class="room-h"><input id="r'+i+'-name" class="name" data-f="name" value="'+esc(r.name)+'" aria-label="Назва кімнати"><button class="x" type="button" data-del="'+i+'">Видалити</button></div>'+
+      '<div class="grid four">'+
+        fld(i,"l","Довжина, м",r.l)+fld(i,"w","Ширина, м",r.w)+fld(i,"h","Висота, м",r.h)+fld(i,"t","Температура, °C",r.t)+
+        fld(i,"ow","Зовнішні стіни, м",r.ow)+fld(i,"win","Вікна, м²",r.win)+fld(i,"door","Зовн. двері, м²",r.door)+
+        sel(i,"roof","Стеля",ROOF_OPT,r.roof)+sel(i,"floor","Підлога",FLOOR_OPT,r.floor)+
+      '</div><div class="res"></div></article>';
+  }).join("");
+}
+$("rooms").addEventListener("click",function(e){
+  var b=e.target.closest("[data-del]");if(!b)return;
+  S.rooms.splice(+b.dataset.del,1);renderRooms();refresh();
+});
+$("addRoom").addEventListener("click",function(){
+  S.rooms.push(room("Кімната "+(S.rooms.length+1),4,3,2.7,3,1.5,0,20,"attic","ground"));
+  renderRooms();refresh();
+  var last=$("r"+(S.rooms.length-1)+"-name");if(last){last.focus();last.select();}
+});
+
+/* ---------- estimate rows (built once) ---------- */
+var ROWS=[
+ ["Обладнання",[["rad"],["boiler"],["bundle"]]],
+ ["Матеріали",[["kit"],["pipe"],["fit"],["ins"],["manifold"]]],
+ ["Робота",[["wRad"],["wPipe"],["wBoiler"],["wStart"]]]
+];
+(function(){
+  $("est").innerHTML=ROWS.map(function(g){
+    return '<div class="grp">'+g[0]+'</div>'+g[1].map(function(r){var k=r[0];
+      return '<div class="row"><div class="nm" id="nm-'+k+'"></div><div class="qty" id="q-'+k+'"></div>'+
+        '<label class="pr"><input id="pr-'+k+'" type="text" inputmode="text" autocomplete="off" data-price="'+k+'" aria-label="Ціна"><span id="u-'+k+'"></span></label>'+
+        '<div class="sum num" id="s-'+k+'"></div></div>';}).join("");
+  }).join("")+
+  '<div class="tot" style="margin-top:12px"><span>Обладнання й матеріали</span><span class="num" id="tMat"></span></div>'+
+  '<div class="tot"><span>Робота</span><span class="num" id="tWork"></span></div>'+
+  '<div class="tot big"><span>Разом</span><span class="num" id="tAll"></span></div>';
+})();
+
+/* ---------- calculation ---------- */
+var last=null;
+function calc(){
+  var p=S.p,Uw=WALLS[p.wall][1],Uwin=WINS[p.win][1],Ur=ROOFS[p.roof][1],Uf=FLOORS[p.floor][1];
+  var rad=RADS[p.rad],fuel=FUELS[p.fuel];
+  var tot={wall:0,win:0,roof:0,floor:0,vent:0},rooms=[],points=0,units=0,m=1+p.margin/100;
+  S.rooms.forEach(function(r){
+    var dT=Math.max(0,r.t-p.tout),A=r.l*r.w,V=A*r.h;
+    var wa=Math.max(0,r.ow*r.h-r.win-r.door);
+    var q={
+      wall:Uw*wa*dT*m,
+      win:(Uwin*r.win+2.0*r.door)*dT*m,
+      roof:r.roof==="attic"?Ur*A*dT*m:0,
+      floor:(r.floor==="ground"?Uf*A*dT:r.floor==="cold"?Uf*A*dT*0.6:0)*m,
+      vent:0.34*p.n*V*dT
+    };
+    var Q=q.wall+q.win+q.roof+q.floor+q.vent;
+    var pts=Q>0?Math.max(1,Math.ceil(Q/1800)):0;
+    var need=Q/rad.w,u=rad.step<1?Math.round(Math.ceil(need/rad.step-1e-9)*rad.step*10)/10:Math.ceil(need-1e-9);
+    Object.keys(tot).forEach(function(k){tot[k]+=q[k];});
+    points+=pts;units+=u;
+    rooms.push({q:q,Q:Q,pts:pts,u:u,A:A});
+  });
+  var Qt=rooms.reduce(function(s,r){return s+r.Q;},0);
+  var needKw=Qt*(1+p.reserve/100)*(p.dhw?1.25:1)/1000;
+  var size=0;
+  if(needKw>0){size=fuel.sizes.filter(function(s){return s>=needKw;})[0]||Math.ceil(needKw/5)*5;}
+  var waste=1+p.waste/100;
+  var pipes=Math.ceil(points*p.pipePer*waste);
+  var items={
+    rad:{name:rad.n,qty:Math.round(units*10)/10,unit:rad.unit},
+    boiler:{name:"Котел: "+fuel.n.toLowerCase(),qty:size,unit:"кВт"},
+    bundle:{name:"Обвʼязка котла: насос, група безпеки, бак, фільтр",qty:size>0?1:0,unit:"компл."},
+    kit:{name:"Підключення радіатора: кран, клапан, кріплення",qty:points,unit:"шт"},
+    pipe:{name:"Труби опалення (подача й зворотка)",qty:pipes,unit:"м"},
+    fit:{name:"Фітинги",qty:Math.ceil(points*6*waste),unit:"шт"},
+    ins:{name:"Ізоляція труб",qty:pipes,unit:"м"},
+    manifold:{name:"Вихід колектора",qty:points,unit:"шт"},
+    wRad:{name:"Монтаж радіаторів",qty:points,unit:"точок"},
+    wPipe:{name:"Прокладка труб",qty:pipes,unit:"м"},
+    wBoiler:{name:"Монтаж котла й обвʼязки",qty:size>0?1:0,unit:"компл."},
+    wStart:{name:"Заповнення, опресовка, запуск",qty:size>0?1:0,unit:"компл."}
+  };
+  var mat=0,work=0;
+  Object.keys(items).forEach(function(k){
+    var it=items[k];it.price=S.prices[k]||0;it.sum=it.qty*it.price;
+    if(k[0]==="w")work+=it.sum;else mat+=it.sum;
+  });
+  return {tot:tot,rooms:rooms,Qt:Qt,size:size,needKw:needKw,items:items,mat:mat,work:work,all:mat+work,points:points,units:units,rad:rad};
+}
+
+function barHTML(q,Q){
+  if(Q<=0)return "";
+  return SEG.map(function(s){var w=q[s[0]]/Q*100;return w>0.2?'<i style="width:'+w+'%;background:var('+s[2]+')"></i>':"";}).join("");
+}
+
+function refresh(){
+  var c=calc();last=c;
+  $("sQ").innerHTML=fmt1(c.Qt/1000)+'<small>кВт</small>';
+  $("sB").innerHTML=(c.size||0)+'<small>кВт</small>';
+  $("sT").innerHTML=fmt(c.all)+'<small>грн</small>';
+  $("bar").innerHTML=barHTML(c.tot,c.Qt);
+  $("legend").innerHTML=SEG.map(function(s){
+    var v=c.tot[s[0]],pc=c.Qt>0?Math.round(v/c.Qt*100):0;
+    return '<span><b style="background:var('+s[2]+')"></b>'+s[1]+' <em>'+pc+'%</em></span>';
+  }).join("");
+  document.querySelectorAll(".room").forEach(function(card){
+    var r=c.rooms[+card.dataset.i];if(!r)return;
+    var box=card.querySelector(".res");
+    box.innerHTML='<span>Втрати <span class="num q">'+fmt(r.Q)+' Вт</span></span>'+
+      '<span>Радіатор <span class="num">'+fmt1(r.u)+' '+c.rad.unit+'</span>'+(r.pts>1?' <span style="color:var(--muted)">на '+r.pts+' прилади</span>':'')+'</span>'+
+      '<span style="color:var(--muted)">Площа <span class="num" style="color:var(--ink)">'+fmt1(r.A)+' м²</span></span>'+
+      '<div class="bar">'+barHTML(r.q,r.Q)+'</div>';
+  });
+  Object.keys(c.items).forEach(function(k){
+    var it=c.items[k];
+    $("nm-"+k).textContent=it.name;
+    $("q-"+k).textContent=fmt1(it.qty)+" "+it.unit;
+    $("u-"+k).textContent="грн/"+it.unit;
+    var inp=$("pr-"+k);if(document.activeElement!==inp)inp.value=it.price;
+    $("s-"+k).textContent=fmt(it.sum)+" грн";
+  });
+  $("tMat").textContent=fmt(c.mat)+" грн";
+  $("tWork").textContent=fmt(c.work)+" грн";
+  $("tAll").textContent=fmt(c.all)+" грн";
+  $("dQ").textContent=fmt1(c.Qt/1000)+" кВт";
+  $("dB").textContent=(c.size||0)+" кВт";
+  $("dT").textContent=fmt(c.all)+" грн";
+  save();
+}
+
+/* ---------- copy / reset ---------- */
+function summary(){
+  var c=last||calc(),L=[];
+  L.push("Опалення: "+CITIES[S.p.city][0]+", зовнішня "+S.p.tout+" °C");
+  L.push("Тепловтрати: "+fmt1(c.Qt/1000)+" кВт; котел: "+c.size+" кВт ("+FUELS[S.p.fuel].n.toLowerCase()+")");
+  L.push("");
+  S.rooms.forEach(function(r,i){var x=c.rooms[i];L.push(r.name+": "+fmt(x.Q)+" Вт, радіатор "+fmt1(x.u)+" "+c.rad.unit);});
+  L.push("");
+  Object.keys(c.items).forEach(function(k){var it=c.items[k];L.push(it.name+": "+fmt1(it.qty)+" "+it.unit+" × "+fmt(it.price)+" = "+fmt(it.sum)+" грн");});
+  L.push("");
+  L.push("Обладнання й матеріали: "+fmt(c.mat)+" грн");
+  L.push("Робота: "+fmt(c.work)+" грн");
+  L.push("Разом: "+fmt(c.all)+" грн");
+  return L.join("\n");
+}
+$("copy").addEventListener("click",function(){
+  var txt=summary(),btn=$("copy"),area=$("copyArea");
+  function fallback(){area.hidden=false;area.value=txt;area.focus();area.select();btn.textContent="Виділено, скопіюйте вручну";}
+  try{
+    navigator.clipboard.writeText(txt).then(function(){area.hidden=true;btn.textContent="Скопійовано";setTimeout(function(){btn.textContent="Скопіювати підсумок";},1800);},fallback);
+  }catch(e){fallback();}
+});
+var armed=false;
+$("reset").addEventListener("click",function(){
+  var b=$("reset");
+  if(!armed){armed=true;b.textContent="Натисніть ще раз, щоб скинути";setTimeout(function(){armed=false;b.textContent="Скинути до прикладу";},3000);return;}
+  armed=false;b.textContent="Скинути до прикладу";
+  S=fresh();syncParams();renderRooms();refresh();
+});
+
+document.addEventListener("focusin",function(e){var t=e.target;if(t.matches&&t.matches("input[inputmode=text]")){try{t.select();}catch(x){}}});
+syncParams();renderRooms();refresh();
+})();
+</script>
+
+</body>
+</html>
